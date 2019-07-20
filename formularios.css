@@ -1,0 +1,30 @@
+body {
+    font: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+}
+
+th {
+    background-color: #CCCCCC;
+    text-align: right;
+    font-weight: bold;
+}
+
+td {
+    background-color: white;
+    text-align: left;
+}
+
+h1 {
+    font-size: 18px;
+    text-align: center;
+}
+
+h2 {
+    font-size: 16px;
+    text-align: center;
+}
+
+h3 {
+    font-size: 14px;
+    text-align: center;
+}
