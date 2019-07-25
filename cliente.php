@@ -35,8 +35,9 @@ if (isset($_POST['log']) && isset($_POST['pas']) && isset($_POST['nom'])
         if ($stmt->rowCount() <= 0) {
             $stmt->closeCursor();
             $stmt = null;
+            $tipo = 1;
             $msg = '<tr><th colspan="2">Es un registro valido</th></tr>';
-            $stmt = $con->prepare('insert into cliente (login, password, nombres, apellidos, direccion, telefono, email) values (?,?,?,?,?,?,?)');
+            $stmt = $con->prepare('insert into cliente (login, password, nombres, apellidos, direccion, telefono, email,id_tipo_usu) values (?,?,?,?,?,?,?,?)');
             $stmt->bindParam(1, $log, PDO::PARAM_STR);
             $stmt->bindParam(2, $pas, PDO::PARAM_STR);
             $stmt->bindParam(3, $nom, PDO::PARAM_STR);
@@ -44,6 +45,7 @@ if (isset($_POST['log']) && isset($_POST['pas']) && isset($_POST['nom'])
             $stmt->bindParam(5, $dir, PDO::PARAM_STR);
             $stmt->bindParam(6, $tel, PDO::PARAM_INT);
             $stmt->bindParam(7, $ema, PDO::PARAM_STR);
+            $stmt->bindParam(8, $tipo, PDO::PARAM_INT);
             if ($stmt->execute()) {
                 $stmt->closeCursor();
                 $stmt = null;

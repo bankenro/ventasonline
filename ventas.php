@@ -20,7 +20,7 @@ if (isset($_SESSION['registrado'])) {
             $stmt1 = $con->prepare('select * from producto where codigo like ?');
             $stmt1->bindParam(1, $pro, PDO::PARAM_STR);
             $stmt1->execute();
-            $data1 = $stmt1->fetch();
+            $data1 = $stmt1->fetchAll(PDO::FETCH_ASSOC);
             $stmt1->closeCursor();
             $stmt1 = null;
         }
@@ -28,26 +28,49 @@ if (isset($_SESSION['registrado'])) {
             $sub = $_POST['sub'];
             switch ($sub) {
                 case 'Agregar':
-                    $item = $pro;
-                    if (isset($_POST['can']))
+                    if (isset($_POST['pro']) && isset($_POST['can']) && isset($_POST['pre']) &&
+                        isset($_POST['stk']) && isset($_POST['des'])) {
+                        $item = $_POST['pro'];
                         $cantidad = $_POST['can'];
-                    if (isset($itemsEnCesta) ) {
-                        $itemsEnCesta = $_SESSION['itemsEnCesta'];
-                        if ($item) {
-                            if (!isset($itemsEnCesta)) {
-                                $itemsEnCesta[$item] = $cantidad;
-                            } else {
-                                foreach ($itemsEnCesta as $k => $v) {
-                                    if ($item == $k) {
-                                        $itemsEnCesta[$k] += $cantidad;
-                                        $encontrado = 1;
+                        $precio = $_POST['pre'];
+                        $stock = $_POST['stk'];
+                        $descripcion = $_POST['des'];
+                        if ($cantidad > 0 && $cantidad <= $stock) {
+                            if (isset($itemsEnCesta)) {
+                                $itemsEnCesta = $_SESSION['itemsEnCesta'];
+                                if ($item) {
+                                    if (!isset($itemsEnCesta)) {
+                                        $itemsEnCesta[$item]['pro'] = $item;
+                                        $itemsEnCesta[$item]['cantidad'] = $cantidad;
+                                        $itemsEnCesta[$item]['precio'] = $precio;
+                                        $itemsEnCesta[$item]['descripcion'] = $descripcion;
+                                        $itemsEnCesta[$item]['subtotal'] = $cantidad * $precio;
+                                        $itemsEnCesta[$item]['stock'] = $stock - $cantidad;
+                                        //$itemsEnCesta[$item] = array('pro' => $item, 'cantidad' => $cantidad, 'subtotal' => $cantidad * $precio, 'stock' => $stock - $cantidad);
+                                    } else {
+                                        foreach ($itemsEnCesta as $k => $v) {
+                                            if ($item == $k) {
+                                                $itemsEnCesta[$k]['cantidad'] += $cantidad;
+                                                $itemsEnCesta[$k]['subtotal'] = $itemsEnCesta[$k]['cantidad'] * $itemsEnCesta[$k]['precio'];
+                                                $encontrado = 1;
+                                            }
+                                        }
+                                        if (!$encontrado) {
+                                            $itemsEnCesta[$item]['pro'] = $item;
+                                            $itemsEnCesta[$item]['cantidad'] = $cantidad;
+                                            $itemsEnCesta[$item]['precio'] = $precio;
+                                            $itemsEnCesta[$item]['descripcion'] = $descripcion;
+                                            $itemsEnCesta[$item]['subtotal'] = $cantidad * $precio;
+                                            $itemsEnCesta[$item]['stock'] = $stock - $cantidad;
+                                            //$itemsEnCesta[$item] = array('pro' => $item, 'cantidad' => $cantidad, 'subtotal' => $cantidad * $precio, 'stock' => $stock - $cantidad);
+                                        }
                                     }
                                 }
-                                if (!$encontrado || isset($encontrado))
-                                    $itemsEnCesta[$item] = $cantidad;
+                                $_SESSION['itemsEnCesta'] = $itemsEnCesta;
                             }
+                        } else {
+                            echo '<script>window.alert("La cantidad es igual a 0 o sobrepaso el stock")</script>';
                         }
-                        $_SESSION['itemsEnCesta'] = $itemsEnCesta;
                     }
                     break;
                 case 'Grabar compra':
@@ -59,7 +82,9 @@ if (isset($_SESSION['registrado'])) {
                             $stmt->bindParam(1, $k, PDO::PARAM_STR);
                             $stmt->execute();
                             $t = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                            $tot += $t[0]['precio'] * $v;
+                            $stmt->closeCursor();
+                            $stmt = null;
+                            $tot = $tot + ($t[0]['precio'] * $itemsEnCesta[$k]['cantidad']);
                         }
                         $fec = date('Y/m/d');
                         $log = $_SESSION['log'];
@@ -75,13 +100,22 @@ if (isset($_SESSION['registrado'])) {
                         $stmt3->bindParam(1, $log, PDO::PARAM_STR);
                         $stmt3->execute();
                         $r = $stmt3->fetchAll(PDO::FETCH_ASSOC);
-                        $numven = $r[0]['numv'];;
+                        $numven = $r[0]['numv'];
                         foreach ($itemsEnCesta as $k => $v) {
                             $stmt4 = $con->prepare('insert into detalle (numero_venta, cantidad, codigo) VALUES (?,?,?)');
                             $stmt4->bindParam(1, $numven, PDO::PARAM_STR);
-                            $stmt4->bindParam(2, $v, PDO::PARAM_STR);
+                            $stmt4->bindParam(2, $itemsEnCesta[$k]['cantidad'], PDO::PARAM_STR);
                             $stmt4->bindParam(3, $k, PDO::PARAM_STR);
-                            $stmt4->execute();
+                            if ($stmt4->execute()) {
+                                $stmt4->closeCursor();
+                                $stmt4 = null;
+                                $stmt5 = $con->prepare('update producto set stock = stock-? where codigo like ?');
+                                $stmt5->bindParam(1, $itemsEnCesta[$k]['cantidad'], PDO::PARAM_INT);
+                                $stmt5->bindParam(2, $itemsEnCesta[$k]['pro'], PDO::PARAM_STR);
+                                $stmt5->execute();
+                                $stmt5->closeCursor();
+                                $stmt5 = null;
+                            }
                         }
                         session_destroy();
                         header("Location:default.htm");
@@ -94,10 +128,11 @@ if (isset($_SESSION['registrado'])) {
         <table align="center">
             <form action="ventas.php" method="post" name="f">
                 <tr>
+                    <th>Codigo</th>
                     <th>Producto</th>
-                    <th>Precio Unitario</th>
+                    <th>Precio/U</th>
                     <th>Stock</th>
-                    <th>Cantidad a Comprar</th>
+                    <th>Cantidad</th>
                     <th rowspan="2">
                         <input type="submit" name="sub" value="Agregar">
                     </th>
@@ -110,7 +145,7 @@ if (isset($_SESSION['registrado'])) {
                         $res = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         ?>
                         <select name="pro" onChange="enviar();">
-                            <option value="0">Selecciona el producto a comprar...</option>
+                            <option value="0">Selecciona</option>
                             <?php
                             foreach ($res as $r) {
                                 ?>
@@ -123,17 +158,19 @@ if (isset($_SESSION['registrado'])) {
                                         <?php
                                     }
                                 }
-                                ?>><?php echo $r['codigo'] . '->' . $r['descripcion']; ?></option>
+                                ?>><?php echo $r['codigo']; ?></option>
                                 <?php
                             }
                             ?>
                         </select>
                     </th>
-                    <th><input type="text" name="pre" size="10" disabled
-                               value="<?php if (isset($data1)) echo $data1['precio']; ?>"></th>
-                    <th><input type="text" name="stk" size="10" disabled
-                               value="<?php if (isset($data1) > 0) echo $data1['stock']; ?>"></th>
-                    <th><input type="text" name="can" size="10"></th>
+                    <th><input type="text" name="des" size="10" READONLY
+                               value="<?php if (isset($data1)) echo $data1[0]['descripcion']; ?>"></th>
+                    <th><input type="text" name="pre" size="10" READONLY
+                               value="<?php if (isset($data1)) echo $data1[0]['precio']; ?>"></th>
+                    <th><input type="text" name="stk" size="10" READONLY
+                               value="<?php if (isset($data1) > 0) echo $data1[0]['stock']; ?>"></th>
+                    <th><input type="number" value="0" name="can" size="3"></th>
                 </tr>
             </form>
         </table>
@@ -144,19 +181,24 @@ if (isset($_SESSION['registrado'])) {
                 <tr bgcolor="gray">
                     <th>N°</th>
                     <TD>Codigo</TD>
+                    <td>Descripcion</td>
                     <td>Cantidad</td>
+                    <td>Precio</td>
+                    <td>Sub Total</td>
                 </tr>
                 <?php
                 $c = 1;
                 if (isset($_SESSION['itemsEnCesta']))
                     $itemsEnCesta = $_SESSION['itemsEnCesta'];
-
-                foreach ($itemsEnCesta as $k => $v) {
+                foreach ($itemsEnCesta as $row) {
                     ?>
                     <tr>
                         <th><?php echo $c; ?></th>
-                        <td><?php echo $k ?></td>
-                        <td><?php echo $v ?></td>
+                        <td><?php echo $row['pro']; ?></td>
+                        <td><?php echo $row['descripcion']; ?></td>
+                        <td><?php echo $row['cantidad']; ?></td>
+                        <td><?php echo $row['precio']; ?></td>
+                        <td><?php echo $row['subtotal']; ?></td>
                     </tr>
                     <?php
                     $c++;

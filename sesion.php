@@ -31,14 +31,21 @@ if (isset($_POST['login']) && isset($_POST['clave'])) {
         //session_register('log');
         //$registrado = 'SI';
         //session_register('registrado');
-        $log = '';
-        foreach ($data as $row) {
-            $log = $row['login'];
-        }
+        $log = $data[0]['login'];
+        $tipo = $data[0]['id_tipo_usu'];
+        /*foreach ($data as $row) {
+             $log = $row['login'];
+         }*/
         $_SESSION['log'] = $log;
         $_SESSION['registrado'] = 'SI';
         $_SESSION['itemsEnCesta'] = array();
-        header('Location:ventas.php');
+        if ($tipo == 1) {
+            header('Location:ventas.php');
+        } else if ($tipo == 2) {
+            header('Location:productos.php');
+        } else {
+            header('Location:default.php');
+        }
     }
 } else {
     header('Location:default.htm');
